@@ -1,6 +1,6 @@
 # ethereum-toolkit
 Basic Rust code for parsing Ethereum and Ethereum Classic Block JSON logs. When looking at Eth logs, I like
-to start with Python or Ruby interactively in a REPL. But then for repeatable, **reliable** code, I
+to start with Python or Ruby interactively in a REPL. But then for repeatable, **working** code, I
 prefer a well typed language like Rust. Once a number of support functions and definitions are written,
 I find it **faster** to work with data. This repo contains much of this basic support, including Newtypes
 for simple value types and structs for strongly typed JSON deserialization.
