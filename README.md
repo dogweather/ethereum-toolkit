@@ -1,5 +1,5 @@
 # ethereum-toolkit
-Basic Rust code for parsing Ethereum and Ethereum Classic Block JSON logs:
+Basic Rust code for parsing Ethereum and Ethereum Classic block JSON logs:
 
 ```json
 [
