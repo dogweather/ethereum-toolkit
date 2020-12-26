@@ -68,7 +68,7 @@ struct Height(u64);
 struct Time(u64);
 
 //
-// Eth / Etc Block Logs
+// The JSON file structure
 //
 
 #[derive(Deserialize, Debug, Clone)]
@@ -104,11 +104,11 @@ struct TransactionDetail {
 fn main() {
     let blockchain_file: Blockchain = serde_json::from_str(FILE_DATA).unwrap();
     let cleaned_up_blockchain = blockchain_file.de_dup();
-    let common_ancestors = duplicated_parents(&cleaned_up_blockchain);
-    let _block_by_hash = make_lookup_by_hash(&cleaned_up_blockchain);
+    let parent_hashes = parent_hashes(&cleaned_up_blockchain);
+    let common_ancestors = duplicated_parents(&parent_hashes);
 
     println!(
-        "Number of duplicate Parent references (reorgs): {}\n",
+        "Number of duplicate Parent references: {}\n",
         common_ancestors.len()
     );
 }
@@ -120,25 +120,22 @@ impl Blockchain {
             .0
             .iter()
             .unique_by(|b| b.block_hash.to_owned())
-            .map(|b| b.to_owned())
+            .cloned()
             .collect();
 
         Blockchain(de_duped_blocks)
     }
 }
 
-fn duplicated_parents(blockchain: &Blockchain) -> HashSet<BlockHash> {
-    let all_parents = parent_hashes(blockchain);
-    let mut duplicated_parents = HashSet::new();
-    let mut prev_item = String::new();
+fn duplicated_parents<'a>(all_parents: &'a [&BlockHash]) -> HashSet<&'a BlockHash> {
+    let mut duplicated_parents: HashSet<&BlockHash> = HashSet::new();
+    let mut prev_item = "";
 
     for p in all_parents.iter().sorted() {
-        let hash = p.to_owned();
-
-        if hash.0 == prev_item {
-            duplicated_parents.insert(hash);
+        if p.0 == prev_item {
+            duplicated_parents.insert(p);
         } else {
-            prev_item = hash.0;
+            prev_item = &p.0;
         }
     }
 
@@ -148,52 +145,46 @@ fn duplicated_parents(blockchain: &Blockchain) -> HashSet<BlockHash> {
 impl Block {
     /// Return a Block's direct children by looking for blocks
     /// with matching parent hashes.
-    fn children(&self, in_chain: &Blockchain) -> Vec<Block> {
+    fn children<'a>(&self, in_chain: &'a Blockchain) -> Vec<&'a Block> {
         in_chain
             .0
             .iter()
             .filter(|b| b.parent_hash == self.block_hash)
-            .map(|b| b.to_owned())
             .collect()
     }
 
     /// Recursively find the Block's chain by matching
     /// parent hashes to block hashes.
-    fn chain(&self, in_chain: &Blockchain) -> Vec<Block> {
+    fn chain<'a>(&'a self, in_chain: &'a Blockchain) -> Vec<&'a Block> {
         let children = self.children(in_chain);
         let child = children.first();
 
         match child {
             Some(sub_node) => {
                 let mut child_chain = sub_node.chain(in_chain);
-                child_chain.insert(0, self.to_owned());
+                child_chain.insert(0, self);
                 child_chain
             }
             None => {
-                let mut just_me: Vec<Block> = Vec::new();
-                just_me.push(self.to_owned());
+                let mut just_me: Vec<&Block> = Vec::new();
+                just_me.push(self);
                 just_me
             }
         }
     }
 }
 
-fn parent_hashes(blockchain: &Blockchain) -> Vec<BlockHash> {
-    blockchain
-        .to_owned()
-        .0
-        .into_iter()
-        .map(|b| b.parent_hash)
-        .collect()
+fn parent_hashes(blockchain: &Blockchain) -> Vec<&BlockHash> {
+    blockchain.0.iter().map(|b| &b.parent_hash).collect()
 }
 
-fn make_lookup_by_hash(blockchain: &Blockchain) -> HashMap<BlockHash, Block> {
+fn make_lookup_by_hash(blockchain: &Blockchain) -> HashMap<&BlockHash, &Block> {
     let mut new_map = HashMap::new();
+
     for block in &blockchain.0 {
-        let value = block.to_owned();
-        let key = value.block_hash.to_owned();
-        new_map.insert(key, value);
+        new_map.insert(&block.block_hash, block);
     }
+
     new_map
 }
 
@@ -286,12 +277,12 @@ mod tests {
 
     #[test]
     fn can_lookup_a_block() {
-        let block_map = make_lookup_by_hash(&testdata());
-        let actual = block_map
-            .get(&BlockHash(
-                "0xb47dac5f582431790f56fd57d1dbafe9afc2355e0116d51cc55a2731e571d7b8".to_string(),
-            ))
-            .unwrap();
+        let key = &BlockHash(
+            "0xb47dac5f582431790f56fd57d1dbafe9afc2355e0116d51cc55a2731e571d7b8".to_string(),
+        );
+        let data = testdata();
+        let block_map = make_lookup_by_hash(&data);
+        let actual = *block_map.get(key).unwrap();
         let expected = &parse_last_block();
 
         assert_eq!(actual, expected)
@@ -307,13 +298,13 @@ mod tests {
             ))
             .unwrap();
         let children = parent_block.children(&blockchain);
-        let actual: Vec<BlockHash> = children.into_iter().map(|b| b.block_hash).collect();
+        let actual: Vec<&BlockHash> = children.into_iter().map(|b| &b.block_hash).collect();
 
         let expected = [
-            BlockHash(
+            &BlockHash(
                 "0x5cb67b046d3402906051d99323c3ce78728b305e2ab2ebf2112f3a7e7dca4f92".to_string(),
             ),
-            BlockHash(
+            &BlockHash(
                 "0x6cdc29218373e30080772188a6e92ff67ac4e2be3ab2de2e849d1cdf6b5f4681".to_string(),
             ),
         ];
@@ -359,7 +350,7 @@ mod tests {
 // Helper functions
 //
 
-fn print_chain_summary(name: &str, a_chain: &[Block]) {
+fn print_chain_summary(name: &str, a_chain: &[&Block]) {
     println!("{}", name);
     println!(
         "Length:      {}",
