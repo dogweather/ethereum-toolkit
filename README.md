@@ -52,7 +52,7 @@ for simple value types and structs for [strongly typed JSON deserialization](htt
 I wrote this to create scripts, leveraging Rust's great type system.
 The code assumes there's a JSON file with an array of Blocks and their transactions.
 
-To use it, change the file path at the top to point to a log file you want to inspect:
+To use it, change the file path at the top to point to a log file you want to inspect (very basic here!):
 
 ```rust
 const FILE_DATA: &str = include_str!("../eth_log.json");
